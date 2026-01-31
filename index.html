@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<title>Fluy • Controle Financeiro</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<style>
+body{
+  background:linear-gradient(135deg,#16a34a,#facc15);
+}
+.fade{
+  animation:fade .4s ease;
+}
+@keyframes fade{
+  from{opacity:0;transform:translateY(10px)}
+  to{opacity:1;transform:translateY(0)}
+}
+
+/* RAIO */
+.lightning{
+  animation: lightningFlow 2s infinite ease-in-out;
+  transition: all .4s;
+}
+.positive{stroke:#16a34a;filter:drop-shadow(0 0 6px #16a34a)}
+.neutral{stroke:#facc15;filter:drop-shadow(0 0 6px #facc15)}
+.negative{stroke:#ef4444;filter:drop-shadow(0 0 8px #ef4444)}
+
+@keyframes lightningFlow{
+  0%{transform:scale(1)}
+  50%{transform:scale(1.15)}
+  100%{transform:scale(1)}
+}
+</style>
+</head>
+
+<body class="min-h-screen flex justify-center text-gray-800">
+
+<div class="w-full max-w-md p-4">
+
+<!-- LOGO -->
+<div class="text-center text-white mb-4">
+  <div class="mx-auto bg-white w-16 h-16 rounded-full flex items-center justify-center mb-2">
+    <svg width="34" height="34" viewBox="0 0 24 24">
+      <path id="lightning"
+        d="M13 2L4 14h6l-1 8 9-12h-6l1-8z"
+        fill="none"
+        stroke-width="2.5"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+        class="lightning neutral"/>
+    </svg>
+  </div>
+  <h1 class="text-2xl font-bold">Fluy</h1>
+  <p class="text-sm opacity-90">Seu dinheiro em movimento</p>
+</div>
+
+<!-- LOGIN -->
+<div id="loginBox" class="bg-white rounded-2xl p-4 shadow fade">
+  <h2 class="font-bold mb-3">Entrar</h2>
+  <input id="loginUser" class="w-full mb-2 p-3 border rounded-xl" placeholder="Usuário">
+  <input id="loginPass" type="password" class="w-full mb-3 p-3 border rounded-xl" placeholder="Senha">
+  <button onclick="login()" class="w-full bg-green-600 text-white p-3 rounded-xl mb-2">Entrar</button>
+  <button onclick="showRegister()" class="w-full border p-3 rounded-xl">Criar conta</button>
+</div>
+
+<!-- REGISTER -->
+<div id="registerBox" class="bg-white rounded-2xl p-4 shadow fade hidden">
+  <h2 class="font-bold mb-3">Criar conta</h2>
+  <input id="regUser" class="w-full mb-2 p-3 border rounded-xl" placeholder="Usuário">
+  <input id="regPass" type="password" class="w-full mb-3 p-3 border rounded-xl" placeholder="Senha">
+  <button onclick="register()" class="w-full bg-green-600 text-white p-3 rounded-xl mb-2">Cadastrar</button>
+  <button onclick="showLogin()" class="w-full border p-3 rounded-xl">Voltar</button>
+</div>
+
+<!-- APP -->
+<div id="app" class="hidden fade">
+
+<div class="bg-white rounded-2xl p-4 shadow mb-3">
+<label class="text-sm font-semibold">Mês de análise</label>
+<input type="month" id="month" class="w-full p-3 border rounded-xl mt-2" onchange="render()">
+</div>
+
+<div class="bg-white rounded-2xl p-4 shadow mb-3">
+<p class="text-sm text-gray-500">Saldo disponível</p>
+<h2 class="text-3xl font-bold">R$ <span id="balance">0</span></h2>
+</div>
+
+<div class="bg-white rounded-2xl p-4 shadow mb-3">
+<p class="font-semibold mb-2">Limite de gastos</p>
+<input id="limit" type="number" class="w-full p-3 border rounded-xl mb-2">
+<button onclick="saveLimit()" class="w-full bg-green-600 text-white p-3 rounded-xl">Salvar limite</button>
+<p class="mt-2">Uso do limite: <strong id="limitUse">0%</strong></p>
+</div>
+
+<div class="bg-white rounded-2xl p-4 shadow mb-3">
+<h3 class="font-semibold mb-2">Adicionar Receita</h3>
+<input id="incomeValue" type="number" class="w-full p-3 border rounded-xl mb-2">
+<select id="incomeCat" class="w-full p-3 border rounded-xl mb-2">
+<option>Salário</option><option>Renda Extra</option><option>Freelas</option><option>Outros</option>
+</select>
+<button onclick="addItem('income')" class="w-full bg-green-600 text-white p-3 rounded-xl">Adicionar</button>
+</div>
+
+<div class="bg-white rounded-2xl p-4 shadow mb-3">
+<h3 class="font-semibold mb-2">Adicionar Despesa</h3>
+<input id="expenseValue" type="number" class="w-full p-3 border rounded-xl mb-2">
+<select id="expenseCat" class="w-full p-3 border rounded-xl mb-2">
+<option>Moradia</option><option>Alimentação</option><option>Transporte</option><option>Lazer</option><option>Saúde</option><option>Outros</option>
+</select>
+<button onclick="addItem('expense')" class="w-full bg-red-500 text-white p-3 rounded-xl">Adicionar</button>
+</div>
+
+<div class="bg-white rounded-2xl p-4 shadow mb-3">
+<canvas id="chart"></canvas>
+</div>
+
+<div class="bg-white rounded-2xl p-4 shadow mb-3">
+<p class="font-semibold mb-2">Gasto por categoria</p>
+<ul id="categorySummary"></ul>
+</div>
+
+<button onclick="logout()" class="w-full bg-black text-white p-3 rounded-xl">Sair</button>
+
+</div>
+</div>
+
+<script>
+let users=JSON.parse(localStorage.getItem("fluy_users"))||{};
+let currentUser=localStorage.getItem("fluy_logged");
+let chart;
+
+function showRegister(){loginBox.classList.add("hidden");registerBox.classList.remove("hidden")}
+function showLogin(){registerBox.classList.add("hidden");loginBox.classList.remove("hidden")}
+
+function register(){
+if(!regUser.value||!regPass.value) return alert("Preencha tudo");
+if(users[regUser.value]) return alert("Usuário já existe");
+users[regUser.value]={pass:regPass.value,data:[],limit:0};
+localStorage.setItem("fluy_users",JSON.stringify(users));
+alert("Conta criada!");
+showLogin();
+}
+
+function login(){
+if(!users[loginUser.value]||users[loginUser.value].pass!==loginPass.value)
+return alert("Dados inválidos");
+currentUser=loginUser.value;
+localStorage.setItem("fluy_logged",currentUser);
+startApp();
+}
+
+function logout(){localStorage.removeItem("fluy_logged");location.reload();}
+
+function startApp(){
+loginBox.classList.add("hidden");
+registerBox.classList.add("hidden");
+app.classList.remove("hidden");
+month.value=new Date().toISOString().slice(0,7);
+render();
+}
+
+function addItem(type){
+const v=type==="income"?+incomeValue.value:+expenseValue.value;
+const c=type==="income"?incomeCat.value:expenseCat.value;
+if(!v) return;
+users[currentUser].data.push({type,value:v,cat:c,month:month.value,date:new Date().toLocaleDateString("pt-BR")});
+localStorage.setItem("fluy_users",JSON.stringify(users));
+render();
+}
+
+function saveLimit(){
+users[currentUser].limit=+limit.value;
+localStorage.setItem("fluy_users",JSON.stringify(users));
+render();
+}
+
+function render(){
+const u=users[currentUser];
+let income=0,expense=0,cats={};
+
+u.data.filter(i=>i.month===month.value).forEach(i=>{
+if(i.type==="income") income+=i.value;
+else{expense+=i.value;cats[i.cat]=(cats[i.cat]||0)+i.value;}
+});
+
+balance.innerText=(income-expense).toFixed(2);
+limit.value=u.limit||"";
+limitUse.innerText=u.limit?Math.min(100,(expense/u.limit*100).toFixed(0))+"%":"0%";
+
+const lightning=document.getElementById("lightning");
+lightning.classList.remove("positive","neutral","negative");
+lightning.classList.add(income-expense>0?"positive":income-expense<0?"negative":"neutral");
+
+if(chart) chart.destroy();
+chart=new Chart(document.getElementById("chart"),{
+type:"pie",
+data:{labels:Object.keys(cats),datasets:[{data:Object.values(cats),backgroundColor:["#16a34a","#22c55e","#4ade80","#facc15","#fde047","#65a30d"]}]}
+});
+
+categorySummary.innerHTML="";
+Object.entries(cats).forEach(([c,v])=>{
+categorySummary.innerHTML+=`<li class="flex justify-between bg-gray-100 p-2 rounded">${c}<strong>R$ ${v.toFixed(2)}</strong></li>`;
+});
+}
+
+if(currentUser&&users[currentUser]) startApp();
+</script>
+
+</body>
+</html>
